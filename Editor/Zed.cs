@@ -35,86 +35,127 @@ namespace UnityZedIntegration
 
         public void addSettingsFileIfNeeded()
         {
-            const string defaultSettings = @"{
-            ""file_scan_exclusions"": [
-                ""**/.*"",
-                ""**/*~"",
-
-                ""*.csproj"",
-                ""*.sln"",
-
-                ""**/*.meta"",
-                ""**/*.booproj"",
-                ""**/*.pibd"",
-                ""**/*.suo"",
-                ""**/*.user"",
-                ""**/*.userprefs"",
-                ""**/*.unityproj"",
-                ""**/*.dll"",
-                ""**/*.exe"",
-                ""**/*.pdf"",
-                ""**/*.mid"",
-                ""**/*.midi"",
-                ""**/*.wav"",
-                ""**/*.gif"",
-                ""**/*.ico"",
-                ""**/*.jpg"",
-                ""**/*.jpeg"",
-                ""**/*.png"",
-                ""**/*.psd"",
-                ""**/*.tga"",
-                ""**/*.tif"",
-                ""**/*.tiff"",
-                ""**/*.3ds"",
-                ""**/*.3DS"",
-                ""**/*.fbx"",
-                ""**/*.FBX"",
-                ""**/*.lxo"",
-                ""**/*.LXO"",
-                ""**/*.ma"",
-                ""**/*.MA"",
-                ""**/*.obj"",
-                ""**/*.OBJ"",
-                ""**/*.asset"",
-                ""**/*.cubemap"",
-                ""**/*.flare"",
-                ""**/*.mat"",
-                ""**/*.meta"",
-                ""**/*.prefab"",
-                ""**/*.unity"",
-
-                ""build/"",
-                ""Build/"",
-                ""library/"",
-                ""Library/"",
-                ""obj/"",
-                ""Obj/"",
-                ""ProjectSettings/"",
-                ""UserSettings/"",
-                ""temp/"",
-                ""Temp/"",
-                ""logs"",
-                ""Logs"",
-            ]
-        }";
-
             var settingsPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, ".zed", "settings.json");
             if (!File.Exists(settingsPath))
             {
                 Debug.Log("[ZED] settings file not found, creating default settings file.");
                 Directory.CreateDirectory(Path.GetDirectoryName(settingsPath));
-                File.WriteAllText(settingsPath, defaultSettings);
+                File.WriteAllText(settingsPath, getDefaultSettings());
+                return;
             }
+
+            migrateSettingsFileIfNeeded(settingsPath);
+        }
+
+        static string getDefaultSettings()
+        {
+            var exclusions = new[]
+            {
+                "**/.git",
+                "**/.svn",
+                "**/.hg",
+                "**/.jj",
+                "**/CVS",
+                "**/.DS_Store",
+                "**/Thumbs.db",
+                "**/.classpath",
+                "**/.settings",
+                "**/.*",
+                "**/*~",
+                "**/*.meta",
+                "**/*.booproj",
+                "**/*.pibd",
+                "**/*.suo",
+                "**/*.user",
+                "**/*.userprefs",
+                "**/*.unityproj",
+                "**/*.dll",
+                "**/*.exe",
+                "**/*.pdf",
+                "**/*.mid",
+                "**/*.midi",
+                "**/*.wav",
+                "**/*.gif",
+                "**/*.ico",
+                "**/*.jpg",
+                "**/*.jpeg",
+                "**/*.png",
+                "**/*.psd",
+                "**/*.tga",
+                "**/*.tif",
+                "**/*.tiff",
+                "**/*.3ds",
+                "**/*.3DS",
+                "**/*.fbx",
+                "**/*.FBX",
+                "**/*.lxo",
+                "**/*.LXO",
+                "**/*.ma",
+                "**/*.MA",
+                "**/*.obj",
+                "**/*.OBJ",
+                "**/*.asset",
+                "**/*.cubemap",
+                "**/*.flare",
+                "**/*.mat",
+                "**/*.prefab",
+                "**/*.unity",
+                "build/",
+                "Build/",
+                "library/",
+                "Library/",
+                "obj/",
+                "Obj/",
+                "ProjectSettings/",
+                "UserSettings/",
+                "temp/",
+                "Temp/",
+                "logs",
+                "Logs"
+            };
+
+            var builder = new StringBuilder();
+            builder.AppendLine("{");
+            builder.AppendLine("  \"file_scan_exclusions\": [");
+
+            for (var i = 0; i < exclusions.Length; i++)
+            {
+                var suffix = i == exclusions.Length - 1 ? string.Empty : ",";
+                builder.AppendLine($"    \"{exclusions[i]}\"{suffix}");
+            }
+
+            builder.AppendLine("  ]");
+            builder.Append('}');
+            return builder.ToString();
+        }
+
+        static void migrateSettingsFileIfNeeded(string settingsPath)
+        {
+            var settings = File.ReadAllText(settingsPath);
+            var migrated = settings
+                .Replace("\"*.csproj\",", string.Empty)
+                .Replace("\"*.sln\",", string.Empty)
+                .Replace("\"*.csproj\"", string.Empty)
+                .Replace("\"*.sln\"", string.Empty);
+
+            if (migrated == settings)
+            {
+                return;
+            }
+
+            File.WriteAllText(settingsPath, migrated);
+            Debug.Log("[ZED] Removed '*.csproj' and '*.sln' from .zed/settings.json so Zed can reload Unity project changes.");
         }
 
         public void syncAll()
         {
-            generator.Sync();
             addSettingsFileIfNeeded();
+            generator.Sync();
         }
 
         public void syncIfNeeded(string[] addedFiles, string[] deletedFiles, string[] movedFiles, string[] movedFromFiles, string[] importedFiles)
         {
+            addSettingsFileIfNeeded();
             generator.SyncIfNeeded(addedFiles.Union(deletedFiles).Union(movedFiles).Union(movedFromFiles), importedFiles);
         }
 
@@ -126,8 +167,8 @@ namespace UnityZedIntegration
                 return false;
             }
 
-            generator.Sync();
             addSettingsFileIfNeeded();
+            generator.Sync();
 
             var args = new StringBuilder($"\"{projectPath}\" ");
 
